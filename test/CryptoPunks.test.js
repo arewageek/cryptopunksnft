@@ -61,18 +61,86 @@ describe("Crypto Punks Test Script", async function () {
   });
 
   describe("Transfer Punks to another user", async function () {
+    it("Should revert when token is not listed for sale", async function () {
+      await expect(
+        cryptopunks.connect(addr1).transferPunk(addr2.address, 33)
+      ).to.be.revertedWith("Token not listed for sale");
+    });
     it("Should revert when wallet does not hold the punk", async function () {
+      const tokenId = 4;
+      const minSalesPrice = 20;
+
+      await cryptopunks.connect(owner).setInitialOwner(addr1.address, tokenId);
+
+      await cryptopunks.connect(owner).allInitialOwnersAssigned();
+
+      await cryptopunks.connect(addr1).offerPunkForSale(tokenId, minSalesPrice);
+
       expect(
-        await cryptopunks.connect(addr1).transferPunks([addr2.address], [33])
+        cryptopunks.connect(addr1).transferPunk(addr2.address, tokenId)
       ).to.be.revertedWith("Sender not token owner");
     });
     it("Should mint and transfer punks to another user", async function () {
       const tokenId = 4;
+      const minSalesPrice = 20;
+
       await cryptopunks.connect(owner).setInitialOwner(addr1.address, tokenId);
+
+      await cryptopunks.connect(owner).allInitialOwnersAssigned();
+
+      await cryptopunks.connect(addr1).offerPunkForSale(tokenId, minSalesPrice);
+
       await cryptopunks.connect(addr1).transferPunk(addr2.address, tokenId);
 
       expect(await cryptopunks.balanceOf(addr1.address)).to.equal(0);
       expect(await cryptopunks.balanceOf(addr2.address)).to.equal(1);
+    });
+
+    it("Should revert when token is no longer sellable", async function () {
+      const tokenId = 4;
+      const minSalesPrice = 20;
+
+      await cryptopunks.connect(owner).setInitialOwner(addr1.address, tokenId);
+
+      await cryptopunks.connect(owner).allInitialOwnersAssigned();
+
+      await cryptopunks.connect(addr1).offerPunkForSale(tokenId, minSalesPrice);
+      await cryptopunks.connect(addr1).punkNoLongerForSale(tokenId);
+
+      expect(
+        cryptopunks.connect(addr1).transferPunk(addr2.address, tokenId)
+      ).to.be.revertedWith("Token not listed for sale");
+    });
+  });
+
+  describe("Offer punk for sale to address", async function () {
+    const tokenIndex = Math.floor(Math.random() * 10000n);
+
+    it("Should revert if non-token owner offer sales", async function () {
+      await cryptopunks.connect(owner).allInitialOwnersAssigned();
+      expect(
+        cryptopunks
+          .connect(addr1)
+          .offerPunkForSaleToAddress(tokenIndex, 20, addr2.address)
+      ).to.revertedWith("Not authorized");
+    });
+
+    it("Should offer token for sale to address", async function () {
+      await cryptopunks.connect(owner).allInitialOwnersAssigned();
+      await cryptopunks
+        .connect(owner)
+        .setInitialOwner(addr1.address, tokenIndex);
+      await cryptopunks
+        .connect(addr1)
+        .offerPunkForSaleToAddress(tokenIndex, 20, addr2.address);
+      // console.log(await cryptopunks.punksOfferedForSale[tokenIndex][2]);
+      expect(await cryptopunks.punksOfferedForSale(tokenIndex)).to.equal([
+        true,
+        `${tokenIndex}`,
+        addr1.address,
+        `${20}`,
+        addr2.address,
+      ]);
     });
   });
 });

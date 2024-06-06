@@ -108,7 +108,8 @@ contract CryptoPunksMarket {
     constructor () {
         balanceOf[msg.sender] = maxSupply;
         owner = msg.sender;
-        totalSupply = 100000;
+        totalSupply = 1;
+        maxSupply = 100000;
         punksRemainingToAssign = totalSupply;
         name = "CRYPTOPUNKS";
         symbol = "C";
@@ -127,6 +128,7 @@ contract CryptoPunksMarket {
         
         punkIndexToAddress[punkIndex] = to;
         balanceOf[to]++;
+        totalSupply + 1;
 
         emit Assign(to, punkIndex);
         
@@ -155,10 +157,8 @@ contract CryptoPunksMarket {
     }
 
     // Transfer ownership of a punk to another user without requiring payment
-    function transferPunk(address to, uint punkIndex) external allPunksHaveBeenMinted() tokenUpForSale(punkIndex) {
+    function transferPunk(address to, uint punkIndex) public tokenUpForSale(punkIndex) {
         require(msg.sender == punkIndexToAddress[punkIndex], "Sender not token owner");
-
-        
                 
         emit PunkNoLongerForSale(punkIndex);
         punkIndexToAddress[punkIndex] = to;
@@ -183,6 +183,7 @@ contract CryptoPunksMarket {
 
     function punkNoLongerForSale(uint punkIndex) external allPunksHaveBeenMinted() {
         require((punkIndexToAddress[punkIndex] == msg.sender), "Not authorized");
+        
         require(punkIndex < maxSupply, "Max supply reached");
         
         punksOfferedForSale[punkIndex] = Offer(false, punkIndex, msg.sender, 0, address(0));
@@ -200,7 +201,6 @@ contract CryptoPunksMarket {
 
     function offerPunkForSaleToAddress(uint punkIndex, uint minSalePriceInWei, address toAddress) external allPunksHaveBeenMinted() {
         require(msg.sender == punkIndexToAddress[punkIndex], "Not authorized");
-        require(punkIndex < maxSupply, "Max supply reached");
 
         punksOfferedForSale[punkIndex] = Offer(true, punkIndex, msg.sender, minSalePriceInWei, toAddress);
         emit PunkOffered(punkIndex, minSalePriceInWei, toAddress);
