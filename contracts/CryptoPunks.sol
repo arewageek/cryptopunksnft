@@ -211,12 +211,12 @@ contract CryptoPunksMarket {
 
         Offer memory offer = punksOfferedForSale[punkIndex];
         
-        require(offer.onlySellTo != address(0) && offer.onlySellTo != msg.sender);
+        require(offer.onlySellTo == address(0) || offer.onlySellTo == msg.sender, "Not sellable to public");
         
         require(msg.value < offer.minValue, "Not enough  eth sent"); // Didn't send enough ETH
 
         
-        require(offer.seller != punkIndexToAddress[punkIndex], "Seller is no longer owner"); // Seller no longer owner of punk
+        require(offer.seller == punkIndexToAddress[punkIndex], "Seller is no longer owner"); // Seller no longer owner of punk
 
         address seller = offer.seller;
 
@@ -239,13 +239,16 @@ contract CryptoPunksMarket {
         }
     }
 
-    function withdraw() public onlyOwner() allPunksHaveBeenMinted() {
+    function withdraw() public allPunksHaveBeenMinted() {
         uint amount = pendingWithdrawals[msg.sender];
-        // Remember to zero the pending refund before
-        // sending to prevent re-entrancy attacks
         pendingWithdrawals[msg.sender] = 0;
         payable(msg.sender).transfer(amount);
     }
+
+    // function withdraw() onlyOwner() public view returns(uint) {
+    //     uint amount = pendingWithdrawals[msg.sender];
+    //     return amount;
+    // }
 
     function enterBidForPunk(uint punkIndex) external payable allPunksHaveBeenMinted() {
         require(punkIndex < maxSupply, "Max supply reached");
