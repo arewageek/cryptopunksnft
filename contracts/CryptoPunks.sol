@@ -213,7 +213,7 @@ contract CryptoPunksMarket {
         
         require(offer.onlySellTo == address(0) || offer.onlySellTo == msg.sender, "Not sellable to public");
         
-        require(msg.value < offer.minValue, "Not enough  eth sent"); // Didn't send enough ETH
+        require(msg.value >= offer.minValue, "Not enough  eth sent"); // Didn't send enough ETH
 
         
         require(offer.seller == punkIndexToAddress[punkIndex], "Seller is no longer owner"); // Seller no longer owner of punk
@@ -241,14 +241,10 @@ contract CryptoPunksMarket {
 
     function withdraw() public allPunksHaveBeenMinted() {
         uint amount = pendingWithdrawals[msg.sender];
+        require(amount > 0, "No pending withdrawal");
         pendingWithdrawals[msg.sender] = 0;
         payable(msg.sender).transfer(amount);
     }
-
-    // function withdraw() onlyOwner() public view returns(uint) {
-    //     uint amount = pendingWithdrawals[msg.sender];
-    //     return amount;
-    // }
 
     function enterBidForPunk(uint punkIndex) external payable allPunksHaveBeenMinted() {
         require(punkIndex < maxSupply, "Max supply reached");
@@ -257,17 +253,18 @@ contract CryptoPunksMarket {
         require(msg.value > 0, "Bid amount too low");
         Bid memory existing = punkBids[punkIndex];
         
-        require(msg.value <= existing.value, "Must be above previouse bid");
+        require(msg.value >= existing.value, "Must be above previouse bid");
         if (existing.value > 0) {
             // Refund the failing bid
             pendingWithdrawals[existing.bidder] += existing.value;
         }
         punkBids[punkIndex] = Bid(true, punkIndex, msg.sender, msg.value);
+        
         emit PunkBidEntered(punkIndex, msg.value, msg.sender);
     }
 
     function acceptBidForPunk(uint punkIndex, uint minPrice) external allPunksHaveBeenMinted() maxSupplyNotReached(punkIndex){
-        require(punkIndexToAddress[punkIndex] != msg.sender, "Not authorized");
+        require(punkIndexToAddress[punkIndex] == msg.sender, "Not authorized");
         address seller = msg.sender;
         Bid memory bid = punkBids[punkIndex];
 
@@ -288,9 +285,7 @@ contract CryptoPunksMarket {
 
     function withdrawBidForPunk(uint punkIndex) external maxSupplyNotReached(punkIndex) allPunksHaveBeenMinted() {
 
-        require(punkIndexToAddress[punkIndex] == address(0), "Dead wallet");
-
-        require(punkIndexToAddress[punkIndex] == msg.sender, "invalid sender");
+        require(punkIndexToAddress[punkIndex] != msg.sender, "invalid sender");
 
         Bid memory bid = punkBids[punkIndex];
 
@@ -308,6 +303,10 @@ contract CryptoPunksMarket {
 
     function _setOwner(address newOwner) internal {
         owner = newOwner;
+    }
+
+    function _owner() external view returns(address) {
+        return owner;
     }
 
 }

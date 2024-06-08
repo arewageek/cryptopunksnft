@@ -139,8 +139,33 @@ describe("Crypto Punks Test Script", async function () {
 
       // console.log({ punksOffered });
 
-      const isDataEqual = await cryptopunks.punksOfferedForSale(4);
+      const isDataEqual = await cryptopunks
+        .punksOfferedForSale(4)
+        .then((res) => {
+          let allEqual = true;
+          for (let i = 0; i < res.length; i++) {
+            if (res[i] !== expectedData[i]) {
+              allEqual = false;
+              break;
+            }
+          }
+          // console.log(allEqual);
+          return allEqual;
+        });
+
       expect(isDataEqual).to.equal(true); // Assert the returned boolean value
+
+      // Option 2: Using assertions within the test framework (modify based on your assertion library)
+      // const punksOffered = await cryptopunks.punksOfferedForSale(4);
+      // const expectedData = [true, 4n, addr1.address, 20n, addr2.address];
+
+      // await punksOffered.then((res) => {
+      //   expect(res[0]).to.equal(expectedData[0]);
+      //   expect(res[1]).to.be.bignumber.equal(expectedData[1]); // Handle BigInt comparison
+      //   expect(res[2]).to.equal(expectedData[2]);
+      //   expect(res[3]).to.be.bignumber.equal(expectedData[3]);
+      //   expect(res[4]).to.equal(expectedData[4]);
+      // });
     });
   });
   describe("Buy punk", async function () {
@@ -160,7 +185,9 @@ describe("Crypto Punks Test Script", async function () {
       await cryptopunks.connect(owner).allInitialOwnersAssigned();
       await cryptopunks.connect(addr1).offerPunkForSale(tokenIndex, 20);
 
-      await cryptopunks.connect(addr2).buyPunk(tokenIndex);
+      await cryptopunks
+        .connect(addr2)
+        .buyPunk(tokenIndex, { value: ethers.parseEther("20") });
 
       // confirm new token owner
       expect(await cryptopunks.punkIndexToAddress(tokenIndex)).to.equal(
@@ -170,29 +197,168 @@ describe("Crypto Punks Test Script", async function () {
   });
 
   describe("Withdraw earnings from token sales", async function () {
+    const tokenIndex = 6;
+
     it("Should revert when request is not from contract owner", async function () {
       expect(cryptopunks.connect(addr1).withdraw()).to.be.revertedWith(
         "Unauthorized"
       );
     });
 
-    it("Should revert if aount exceed treasury balance", async function () {
-      // create sales to to inrease balance
+    it("Should revert if amount exceed earnings stored in contract", async function () {
+      // create an offer for a token
+      await cryptopunks
+        .connect(owner)
+        .setInitialOwner(addr1.address, tokenIndex);
+      await cryptopunks.connect(owner).allInitialOwnersAssigned();
+
+      expect(cryptopunks.connect(addr1).withdraw()).to.revertedWith(
+        "No pending withdrawal"
+      );
+    });
+    it("Should Withdraw earnings from contract", async function () {
+      // create an offer for a token
       await cryptopunks
         .connect(owner)
         .setInitialOwner(addr1.address, tokenIndex);
       await cryptopunks.connect(owner).allInitialOwnersAssigned();
       await cryptopunks.connect(addr1).offerPunkForSale(tokenIndex, 20);
 
-      await cryptopunks.connect(addr2).buyPunk(tokenIndex);
-
+      // buy the token from wallet 2
+      await cryptopunks
+        .connect(addr2)
+        .buyPunk(tokenIndex, { value: ethers.parseEther("30") });
       // withdraw earnings from previous sale
       const amount = await cryptopunks.pendingWithdrawals(addr1.address);
-      console.log({ amount });
+
+      expect(amount).to.equal(ethers.parseEther("30"));
+    });
+  });
+
+  describe("Transfer ownership of contract", async function () {
+    it("Should revert if non admin call function", async function () {
+      expect(cryptopunks.connect(addr2).SetNewOwner(addr1)).to.be.revertedWith(
+        "Unauthorized"
+      );
+    });
+    it("Should transfer ownership of the contract", async function () {
+      await cryptopunks.connect(owner).SetNewOwner(addr2);
+      expect(await cryptopunks._owner()).to.equal(addr2.address);
+    });
+  });
+
+  describe("Enter Bid for a token", async function () {
+    const tokenIndex = 404;
+
+    it("Should enter bid for a specified token", async function () {
+      const options = { value: ethers.parseEther("20") };
+      await cryptopunks.connect(owner).allInitialOwnersAssigned();
+      await cryptopunks
+        .connect(owner)
+        .setInitialOwner(addr1.address, tokenIndex);
+      // check active bids
+
+      await cryptopunks
+        .connect(addr1)
+        .enterBidForPunk(tokenIndex, { value: ethers.parseEther("7") });
+
+      const activeBids = await cryptopunks.punkBids(tokenIndex);
+      const expectedBid = [true, 404n, addr1.address, ethers.parseEther("7")];
+
+      let bidMatch = true;
+
+      for (let i = 0; i < activeBids.length; i++) {
+        if (activeBids[i] !== expectedBid[i]) {
+          bidMatch = false;
+          break;
+        }
+      }
+
+      expect(bidMatch).to.be.equal(true);
+    });
+  });
+
+  describe("Accept bid made for a punk", async function () {
+    it("Should revert if non token owner attempts to accept bid", async function () {
+      await cryptopunks.connect(owner).allPunksAssigned();
+      await cryptopunks.connect(owner).allInitialOwnersAssigned();
+      await cryptopunks.connect(owner).setInitialOwner(addr2.address, 2222);
+      await cryptopunks
+        .connect(addr1)
+        .enterBidForPunk(2222, { value: ethers.parseEther("2") });
+
+      // console.log(await cryptopunks.punkBids(2222))
+
+      await expect(
+        cryptopunks
+          .connect(addr1)
+          .acceptBidForPunk(2222, ethers.parseEther("0.2"))
+      ).to.revertedWith("Not authorized");
     });
 
-    // it("Should witdraw tokens if called by owner", async function() {
-    //   const amount =
-    // })
+    it("Should revert when bid amount is below minimum", async function () {
+      await cryptopunks.connect(owner).allPunksAssigned();
+      await cryptopunks.connect(owner).allInitialOwnersAssigned();
+      await cryptopunks.connect(owner).setInitialOwner(addr2.address, 2222);
+      await cryptopunks
+        .connect(addr1)
+        .enterBidForPunk(2222, { value: ethers.parseEther("2") });
+
+      await expect(
+        cryptopunks
+          .connect(addr2)
+          .acceptBidForPunk(2222, ethers.parseEther("5"))
+      ).to.revertedWith("Bid amount below minimum");
+    });
+
+    it("Should accept highest bid made for the requested punk", async function () {
+      await cryptopunks.connect(owner).allPunksAssigned();
+      await cryptopunks.connect(owner).allInitialOwnersAssigned();
+      await cryptopunks.connect(owner).setInitialOwner(addr2.address, 2222);
+      await cryptopunks
+        .connect(addr1)
+        .enterBidForPunk(2222, { value: ethers.parseEther("2") });
+
+      await cryptopunks
+        .connect(addr2)
+        .acceptBidForPunk(2222, ethers.parseEther("1"));
+
+      const newOwner = await cryptopunks.punkIndexToAddress(2222);
+
+      expect(newOwner).to.equal(addr1.address);
+    });
+  });
+
+  describe("Should withdraw bid made on punk", async function () {
+    it("Should withdraw bid", async function () {
+      await cryptopunks.connect(owner).allPunksAssigned();
+      await cryptopunks.connect(owner).allInitialOwnersAssigned();
+      await cryptopunks.connect(owner).setInitialOwner(addr2.address, 2222);
+
+      await cryptopunks
+        .connect(addr1)
+        .enterBidForPunk(2222, { value: ethers.parseEther("2") });
+
+      await cryptopunks.connect(addr1).withdrawBidForPunk(2222);
+
+      const bid = await cryptopunks.punkBids(2222);
+      const expectedBidData = [
+        false,
+        "2222",
+        "0x0000000000000000000000000000000000000000",
+        "0",
+      ];
+
+      let bidsMatched = true;
+
+      for (let i; i < bid.length; i++) {
+        if (expectedBidData[i] !== bid[i]) {
+          bidsMatched = false;
+          break;
+        }
+      }
+
+      expect().to.equal();
+    });
   });
 });
