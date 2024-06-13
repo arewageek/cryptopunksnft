@@ -1,13 +1,9 @@
-# Sample Hardhat Project
+# DOODLES ERC721 NFT TOKEN WITH TEST SCRIPT
 
-This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, and a Hardhat Ignition module that deploys that contract.
+## TOKEN CONTRACT DEPLOYED TO ZIRCUIT TESTNET
 
-Try running some of the following tasks:
+### TOKEN CONTRACT ADDRESS: 0x10c325C6ccAE85138C4F1ec91DD737AB2cc4aad4
 
-```shell
-npx hardhat help
-npx hardhat test
-REPORT_GAS=true npx hardhat test
-npx hardhat node
-npx hardhat ignition deploy ./ignition/modules/Lock.js
-```
+### TOKEN ON ZIRCUIT EXPLORER: https://explorer.zircuit.com/address/0x10c325C6ccAE85138C4F1ec91DD737AB2cc4aad4
+
+![Screenshot of token deployed on zircuit testnet](image.png)
